@@ -135,9 +135,19 @@ class Puppet::Provider::Mongodb < Puppet::Provider
 
   def self.db_ismaster
     cmd_ismaster = 'db.isMaster().ismaster'
-    cmd_ismaster = mongorc_file + cmd_ismaster if mongorc_file
     db = 'admin'
-    res = mongo_cmd(db, conn_string, cmd_ismaster).to_s.chomp
+
+    full_command = if mongorc_file
+                     mongorc_file + cmd_ismaster
+                   else
+                     cmd_ismaster
+                   end
+    res = mongo_cmd(db, conn_string, full_command).to_s.chomp
+
+    # Retry command without authentication when mongorc_file is set and authentication failed
+    if mongorc_file && res =~ %r{Authentication failed}
+      res = mongo_cmd(db, conn_string, cmd_ismaster).to_s.chomp
+    end
     res.eql?('true') ? true : false
   end
 
